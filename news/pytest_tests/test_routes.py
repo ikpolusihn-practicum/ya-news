@@ -2,7 +2,6 @@ from http import HTTPStatus
 from datetime import datetime
 
 import pytest
-from django.contrib.gis.gdal.prototypes.raster import create_ds
 from django.urls import reverse
 from django.test.client import Client
 
@@ -22,6 +21,11 @@ def comment_author_client(comment_author):
     client.force_login(comment_author)
     return comment_author_client
 
+@pytest.fixture
+def other_user_client(other_user):
+    client = Client()
+    client.force_login(other_user)
+    return client
 
 @pytest.fixture
 def new():
@@ -67,13 +71,35 @@ def test_home_availability_for_anonymous_user(client, url_name, new):
         response = client.get(url)
     assert response.status_code == HTTPStatus.OK
 
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
-    'url_name',
-    (
-        'news:delete',
-        'news:edit',
-    )
+    'url_name, client_fixture, expected_status, expected_behavior',
+    [
+        # Author can access edit/delete
+        ('news:edit', pytest.lazy_fixture('comment_author_client'), HTTPStatus.OK, 'access'),
+        ('news:delete', pytest.lazy_fixture('comment_author_client'), HTTPStatus.OK, 'access'),
+
+        # Other user cannot access edit/delete (404 not found)
+        ('news:edit', pytest.lazy_fixture('other_user_client'), HTTPStatus.NOT_FOUND, 'forbidden'),
+        ('news:delete', pytest.lazy_fixture('other_user_client'), HTTPStatus.NOT_FOUND, 'forbidden'),
+
+        # Anonymous user is redirected to login
+        # ('news:edit', pytest.lazy_fixture('anonymous_client'), HTTPStatus.FOUND, 'redirect'),
+        # ('news:delete', pytest.lazy_fixture('anonymous_client'), HTTPStatus.FOUND, 'redirect'),
+    ]
 )
-def test_comment_edit_and_delete_available_just_for_author(url_name, comment_author_client, comment):
+def test_comment_edit_and_delete_access_comprehensive(
+        comment,
+        url_name,
+        client_fixture,
+        expected_status,
+        expected_behavior
+):
     url = reverse(url_name, args=(comment.pk,))
-    response = comment_author_client.get(url)
+    response = client_fixture.get(url)
+
+    assert response.status_code == expected_status
+
+    if expected_behavior == 'redirect':
+        assert 'login' in response.url
