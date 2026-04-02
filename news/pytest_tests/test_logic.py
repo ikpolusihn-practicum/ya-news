@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from datetime import datetime
 
 import pytest
@@ -8,6 +9,8 @@ from django.core.exceptions import ValidationError
 from news.models import News, Comment
 from news.forms import BAD_WORDS, WARNING
 
+ORIGINAL_COMMENT_TEXT = 'original comment text'
+NEW_COMMENT_TEXT = 'new comment text'
 
 @pytest.fixture
 def comment_author(django_user_model):
@@ -44,7 +47,7 @@ def new(comment_author):
     comment = Comment.objects.create(
         news=new,
         author=comment_author,
-        text=f'Original comment text'
+        text=ORIGINAL_COMMENT_TEXT
     )
 
     return new, comment
@@ -79,5 +82,47 @@ def test_bad_words_block(new, authorized_user_client):
         raise ValidationError(WARNING)
 
 @pytest.mark.django_db
-def test_delete_and_edit_comment():
-    ...
+@pytest.mark.parametrize(
+    'action_scenario, user_type, client_fixture',
+    (
+        ('edit', 'author', pytest.lazy_fixture('comment_author_client'),),
+        ('delete', 'author', pytest.lazy_fixture('comment_author_client'),),
+
+        ('edit', 'other_user', pytest.lazy_fixture('authorized_user_client'),),
+        ('delete', 'other_user', pytest.lazy_fixture('authorized_user_client'),),
+    )
+)
+def test_delete_and_edit_comment(
+        new,
+        action_scenario,
+        user_type,
+        client_fixture,
+):
+    new, comment = new
+
+    if action_scenario == 'delete':
+        url = reverse('news:delete', args=(new.pk,))
+        response = client_fixture.post(url)
+        comment_count = Comment.objects.filter(news=new.pk).count()
+        if user_type == 'author':
+            assert response.status_code == HTTPStatus.FOUND
+            assert comment_count == 0
+        elif user_type == 'other_user':
+            assert response.status_code == HTTPStatus.NOT_FOUND
+            assert comment_count == 1
+
+    elif action_scenario == 'edit':
+        url = reverse('news:edit', args=(new.pk,))
+        comment_new_version = {
+            'text': NEW_COMMENT_TEXT,
+        }
+        response = client_fixture.post(url, data=comment_new_version)
+        comment.refresh_from_db()
+
+        if user_type == 'author':
+            assert response.status_code == HTTPStatus.FOUND
+            assert comment.text == NEW_COMMENT_TEXT
+
+        elif user_type == 'other_user':
+            assert response.status_code == HTTPStatus.NOT_FOUND
+            assert comment.text == ORIGINAL_COMMENT_TEXT
