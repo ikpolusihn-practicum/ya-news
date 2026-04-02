@@ -3,8 +3,10 @@ from datetime import datetime
 import pytest
 from django.test.client import Client
 from django.urls import reverse
+from django.core.exceptions import ValidationError
 
 from news.models import News, Comment
+from news.forms import BAD_WORDS, WARNING
 
 
 @pytest.fixture
@@ -50,3 +52,13 @@ def test_comment_creation(new, scenario, client_fixture, expected_comments_count
         assert comment_count == 1
     elif scenario == 'unauthorized_user':
         assert comment_count == 0
+
+@pytest.mark.django_db
+def test_bad_words_block(new, authorized_user_client):
+    url = reverse('news:detail', args=(new.pk,))
+    comment_data = {
+        'text': f'comment_text_{BAD_WORDS[0]}',
+    }
+    authorized_user_client.post(url, comment_data)
+    with pytest.raises(ValidationError):
+        raise ValidationError(WARNING)
