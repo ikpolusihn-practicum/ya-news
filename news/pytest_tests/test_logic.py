@@ -10,6 +10,16 @@ from news.forms import BAD_WORDS, WARNING
 
 
 @pytest.fixture
+def comment_author(django_user_model):
+    return django_user_model.objects.create(username='author')
+
+@pytest.fixture
+def comment_author_client(comment_author):
+    client = Client()
+    client.force_login(comment_author)
+    return client
+
+@pytest.fixture
 def authorized_user(django_user_model):
     return django_user_model.objects.create(username='authorized_user')
 
@@ -24,37 +34,42 @@ def anonymous_user_client():
     return Client()
 
 @pytest.fixture
-def new():
+def new(comment_author):
     new = News.objects.create(
         title = 'new_title',
         text = 'new_text',
         date = datetime.today(),
     )
 
-    return new
+    comment = Comment.objects.create(
+        news=new,
+        author=comment_author,
+        text=f'Original comment text'
+    )
+
+    return new, comment
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     'scenario, client_fixture, expected_comments_count',
     (
-        ('authorized_user', pytest.lazy_fixture('authorized_user_client'), 1),
-        ('unauthorized_user', pytest.lazy_fixture('anonymous_user_client'), 0),
+        ('authorized_user', pytest.lazy_fixture('authorized_user_client'), 2),
+        ('unauthorized_user', pytest.lazy_fixture('anonymous_user_client'), 1),
     )
 )
 def test_comment_creation(new, scenario, client_fixture, expected_comments_count):
+    new, comment = new
     url = reverse('news:detail', args=(new.pk,))
     comment_data = {
         'text': 'comment_text',
     }
     client_fixture.post(url, comment_data)
     comment_count = Comment.objects.filter(news=new.pk).count()
-    if scenario == 'authorized_user':
-        assert comment_count == 1
-    elif scenario == 'unauthorized_user':
-        assert comment_count == 0
+    assert comment_count == expected_comments_count
 
 @pytest.mark.django_db
 def test_bad_words_block(new, authorized_user_client):
+    new, comment = new
     url = reverse('news:detail', args=(new.pk,))
     comment_data = {
         'text': f'comment_text_{BAD_WORDS[0]}',
@@ -62,3 +77,7 @@ def test_bad_words_block(new, authorized_user_client):
     authorized_user_client.post(url, comment_data)
     with pytest.raises(ValidationError):
         raise ValidationError(WARNING)
+
+@pytest.mark.django_db
+def test_delete_and_edit_comment():
+    ...
