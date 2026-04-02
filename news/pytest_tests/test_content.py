@@ -36,6 +36,10 @@ def comment_author_client(comment_author):
     client.force_login(comment_author)
     return client
 
+@pytest.fixture
+def anonymous_user_client():
+    return Client()
+
 @pytest.fixture()
 def create_one_new(comment_author):
 
@@ -55,7 +59,6 @@ def create_one_new(comment_author):
         comment.save()
 
     return new
-
 
 @pytest.mark.django_db
 def test_news_amount_and_order(client, news_creation):
@@ -80,3 +83,10 @@ def test_comments_order(create_one_new, comment_author_client):
     all_timestamps = [comment.created for comment in all_comments]
     sorted_timestamps = sorted(all_timestamps)
     assert all_timestamps == sorted_timestamps
+    assert 'form' in response.context
+
+@pytest.mark.django_db
+def test_comment_form_not_available_for_unauthorised_user(anonymous_user_client, create_one_new):
+    url = reverse('news:detail', args=(create_one_new.pk,))
+    response = anonymous_user_client.get(url)
+    assert 'form' not in response.context
