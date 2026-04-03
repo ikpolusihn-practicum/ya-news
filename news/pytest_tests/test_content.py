@@ -12,6 +12,7 @@ from yanews import settings
 NEWS_AMOUNT = 16
 COMMENTS_AMOUNT = 5
 
+
 @pytest.fixture
 def news_creation():
     current_date = date.today()
@@ -26,9 +27,11 @@ def news_creation():
     ]
     News.objects.bulk_create(news_list)
 
+
 @pytest.fixture
 def comment_author(django_user_model):
     return django_user_model.objects.create(username='author')
+
 
 @pytest.fixture
 def comment_author_client(comment_author):
@@ -36,9 +39,11 @@ def comment_author_client(comment_author):
     client.force_login(comment_author)
     return client
 
+
 @pytest.fixture
 def anonymous_user_client():
     return Client()
+
 
 @pytest.fixture()
 def create_one_new(comment_author):
@@ -60,6 +65,7 @@ def create_one_new(comment_author):
 
     return new
 
+
 @pytest.mark.django_db
 def test_news_amount_and_order(client, news_creation):
     url = reverse('news:home')
@@ -69,10 +75,14 @@ def test_news_amount_and_order(client, news_creation):
 
     dates_from_page = [new.date for new in object_list]
     current_date = date.today()
-    expected_dates = [current_date - timedelta(days=i) for i in range(NEWS_AMOUNT)]
-    expected_dates = sorted(expected_dates, reverse=True)[:settings.NEWS_COUNT_ON_HOME_PAGE]
+    expected_dates = [
+        current_date - timedelta(days=i) for i in range(NEWS_AMOUNT)
+    ]
+    expected_dates = \
+        sorted(expected_dates, reverse=True)[:settings.NEWS_COUNT_ON_HOME_PAGE]
 
     assert dates_from_page == expected_dates
+
 
 @pytest.mark.django_db
 def test_comments_order(create_one_new, comment_author_client):
@@ -85,8 +95,12 @@ def test_comments_order(create_one_new, comment_author_client):
     assert all_timestamps == sorted_timestamps
     assert 'form' in response.context
 
+
 @pytest.mark.django_db
-def test_comment_form_not_available_for_unauthorised_user(anonymous_user_client, create_one_new):
+def test_comment_form_not_available_for_unauthorised_user(
+        anonymous_user_client,
+        create_one_new
+):
     url = reverse('news:detail', args=(create_one_new.pk,))
     response = anonymous_user_client.get(url)
     assert 'form' not in response.context

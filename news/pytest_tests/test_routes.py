@@ -8,13 +8,16 @@ from pytest_django.asserts import assertRedirects
 
 from news.models import News, Comment
 
+
 @pytest.fixture
 def comment_author(django_user_model):
     return django_user_model.objects.create(username='author')
 
+
 @pytest.fixture
 def other_user(django_user_model):
     return django_user_model.objects.create(username='other_user')
+
 
 @pytest.fixture
 def comment_author_client(comment_author):
@@ -22,9 +25,11 @@ def comment_author_client(comment_author):
     client.force_login(comment_author)
     return client
 
+
 @pytest.fixture
 def anonymous_user_client():
     return Client()
+
 
 @pytest.fixture
 def other_user_client(other_user):
@@ -32,15 +37,17 @@ def other_user_client(other_user):
     client.force_login(other_user)
     return client
 
+
 @pytest.fixture
 def new():
     new = News.objects.create(
-        title = 'new_title',
-        text = 'new_text',
-        date = datetime.today(),
+        title='new_title',
+        text='new_text',
+        date=datetime.today(),
     )
 
     return new
+
 
 @pytest.fixture
 def comment(new, comment_author):
@@ -51,6 +58,7 @@ def comment(new, comment_author):
     )
 
     return comment
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
@@ -81,14 +89,20 @@ def test_home_availability_for_anonymous_user(client, url_name, new):
 @pytest.mark.parametrize(
     'url_name, client_fixture, expected_status, scenario',
     [
-        ('news:edit', pytest.lazy_fixture('comment_author_client'), HTTPStatus.OK, 'comment_author'),
-        ('news:delete', pytest.lazy_fixture('comment_author_client'), HTTPStatus.OK, 'comment_author'),
+        ('news:edit', pytest.lazy_fixture('comment_author_client'),
+         HTTPStatus.OK, 'comment_author'),
+        ('news:delete', pytest.lazy_fixture('comment_author_client'),
+         HTTPStatus.OK, 'comment_author'),
 
-        ('news:edit', pytest.lazy_fixture('other_user_client'), HTTPStatus.NOT_FOUND, 'other_user'),
-        ('news:delete', pytest.lazy_fixture('other_user_client'), HTTPStatus.NOT_FOUND, 'other_user'),
+        ('news:edit', pytest.lazy_fixture('other_user_client'),
+         HTTPStatus.NOT_FOUND, 'other_user'),
+        ('news:delete', pytest.lazy_fixture('other_user_client'),
+         HTTPStatus.NOT_FOUND, 'other_user'),
 
-        ('news:edit', pytest.lazy_fixture('anonymous_user_client'), HTTPStatus.FOUND, 'anonymous_user'),
-        ('news:delete', pytest.lazy_fixture('anonymous_user_client'), HTTPStatus.FOUND, 'anonymous_user'),
+        ('news:edit', pytest.lazy_fixture('anonymous_user_client'),
+         HTTPStatus.FOUND, 'anonymous_user'),
+        ('news:delete', pytest.lazy_fixture('anonymous_user_client'),
+         HTTPStatus.FOUND, 'anonymous_user'),
     ]
 )
 def test_comment_and_delete_availability(
